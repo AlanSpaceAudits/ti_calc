@@ -59,7 +59,7 @@ const COMMANDS: &[&str] = &[
     "sum", "product", "det", "inv", "transpose", "rref", "eigenvalues", "eigenvectors", "identity", "dot", "cross", "norm", "trace", "rank", "dim", "convert", "approx",
     "exact", "subst", "numer", "denom", "isprime", "hex", "bin", "oct", "del", "odesolve", "fmin", "fmax", "seq", "len", "polar", "rect", "root", "log2", "atan2", "mod",
     "ncr", "npr", "gcd", "lcm", "min", "max", "int", "frac", "and", "or", "tangent", "arclen", "charpoly", "nullspace", "units", "constants", "nextprime", "degree",
-    "coeffs", "trigexpand", "tolist", "augment", "unit",
+    "coeffs", "trigexpand", "tolist", "augment", "unit", "dms", "todms", "todd", "torad",
 ];
 
 /// (syntax, description) pairs for the function catalog.
@@ -122,6 +122,8 @@ pub const CATALOG: &[(&str, &str)] = &[
     ("constants()", "physical constants such as _c, _g, _h, _k, _Na"),
     ("approx(expr)", "decimal value; exact(x) converts a decimal to a fraction"),
     ("hex(n)", "base conversion; bin(n), oct(n); literals 0xFF, 0b101"),
+    ("todms(x)", "show an angle as degrees, minutes, seconds; todd(x) decimal degrees; torad(x) radians"),
+    ("dms(d, m, s)", "enter an angle in degrees, minutes, seconds; also 12°34'56\""),
     ("polar(z)", "{modulus, argument} of a complex number; rect(r, theta)"),
     ("re(z)", "real part; im(z), conj(z), abs(z), arg(z)"),
     ("sin(x)", "trig: sin cos tan sec csc cot, asin acos atan, sinh cosh tanh and inverses"),
@@ -839,6 +841,40 @@ impl Calc {
                     Some(k) => div(r, k),
                     None => r,
                 }
+            }
+            "dms" => {
+                need(1)?;
+                // sign of the degrees applies to the whole angle
+                let d = a[0].clone();
+                let frac = add(div(a.get(1).cloned().unwrap_or(int(0)), int(60)), div(a.get(2).cloned().unwrap_or(int(0)), int(3600)));
+                let deg = if d.has_neg_coeff() { sub(d, frac) } else { add(d, frac) };
+                match self.settings.angle {
+                    Angle::Deg => deg,
+                    Angle::Rad => mul(deg, mul(rat(1, 180), PI)),
+                    Angle::Grad => mul(deg, rat(10, 9)),
+                }
+            }
+            "todd" | "torad" | "todms" => {
+                need(1)?;
+                // the argument is an angle in the current angle mode
+                let rad = match self.angle_factor() {
+                    Some(k) => mul(a[0].clone(), k),
+                    None => a[0].clone(),
+                };
+                if name == "torad" {
+                    return Ok(rad);
+                }
+                let deg = mul(rad, div(int(180), PI));
+                if name == "todd" {
+                    return Ok(if deg.as_rat().is_some_and(|r| r.is_integer()) { deg } else { to_float(&deg) });
+                }
+                let v = real(&deg)?;
+                // work in hundred-thousandths of an arcsecond so rounding carries correctly
+                let total = (v.abs() * 3600.0 * 1e5).round() as u128;
+                let (d, m, s) = (total / 360_000_000, total / 6_000_000 % 60, (total % 6_000_000) as f64 / 1e5);
+                let secs = format!("{s:.5}");
+                let secs = secs.trim_end_matches('0').trim_end_matches('.');
+                Expr::Str(format!("{}{}°{}'{}\"", if v < 0.0 { "-" } else { "" }, d, m, secs))
             }
             "units" => Expr::Str(units::unit_list()),
             "constants" => Expr::Str(units::CONSTANTS.iter().map(|(n, v, d)| format!("{n} = {v:e}  ({d})")).collect::<Vec<_>>().join("\n")),

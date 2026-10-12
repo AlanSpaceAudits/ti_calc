@@ -10,7 +10,7 @@ enum Tok {
     Op(&'static str),
 }
 
-const OPS: &[&str] = &[":=", "->", "<=", ">=", "!=", "==", "+", "-", "*", "/", "^", "(", ")", "[", "]", "{", "}", ",", ";", "=", "<", ">", "!", "|", "√", "°", "²", "³", "'"];
+const OPS: &[&str] = &[":=", "->", "<=", ">=", "!=", "==", "+", "-", "*", "/", "^", "(", ")", "[", "]", "{", "}", ",", ";", "=", "<", ">", "!", "|", "√", "°", "²", "³", "'", "\""];
 
 fn lex(src: &str) -> Result<Vec<Tok>, String> {
     let s: Vec<char> = src.chars().collect();
@@ -321,7 +321,17 @@ impl Parser<'_> {
             } else if self.eat("³") {
                 e = Expr::Pow(Box::new(e), Box::new(int(3)));
             } else if self.eat("°") {
-                e = Expr::Mul(vec![e, sym("pi"), rat(1, 180)]);
+                // 12°34'56.7": minutes and seconds are optional
+                let mut parts = vec![e, int(0), int(0)];
+                for (slot, mark) in [(1, "'"), (2, "\"")] {
+                    if let (Some(Tok::Num(n)), Some(Tok::Op(m))) = (self.t.get(self.pos), self.t.get(self.pos + 1)) {
+                        if *m == mark {
+                            parts[slot] = n.clone();
+                            self.pos += 2;
+                        }
+                    }
+                }
+                e = Expr::Func("dms".into(), parts);
             } else {
                 break;
             }

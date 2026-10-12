@@ -41,4 +41,3 @@ Cargo workspace with two crates.
 
 - Risch integration, multivariate polynomial factoring, symbolic ODE solving.
 - 2D pretty-printed output.
-- Windows and web builds (the toolchains are not installed on this machine).

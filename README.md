@@ -13,6 +13,14 @@ cargo build --release
 ./target/release/ticalc-cli      # terminal; type `help` for the function list
 ```
 
+Release builds for Linux, Windows and the web go to `dist/`:
+
+```sh
+./scripts/build-dist.sh
+```
+
+This needs `mingw-w64-gcc`, `trunk`, and a rustup toolchain with the `x86_64-pc-windows-gnu` and `wasm32-unknown-unknown` targets. `dist/web/` is a static site; serve it with any web server.
+
 Start-up arguments for the desktop program: `--eval "expr"`, `--plot "f(x)"`, `--tab graph|catalog`.
 
 ## Input
@@ -27,6 +35,8 @@ Start-up arguments for the desktop program: `--eval "expr"`, `--plot "f(x)"`, `-
 | `{1, 2, 3}` | list |
 | `pi`, `e`, `i`, `inf`, `ans` | constants and the last answer |
 | `0xFF`, `0b1010` | hexadecimal and binary integers |
+| `12°34'56"`, `dms(12, 34, 56)` | angle in degrees, minutes, seconds |
+| `todms(x)`, `todd(x)`, `torad(x)` | show an angle as DMS, decimal degrees, or radians |
 
 Modes: angle (RAD / DEG / GRAD), Exact / Approx, Real / Complex, Normal / Sci / Eng notation, Fix digits.
 

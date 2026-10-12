@@ -262,7 +262,16 @@ impl App {
                 resp.request_focus();
                 self.refocus = false;
             }
-            ui.add_space(6.0);
+            ui.horizontal(|ui| {
+                ui.label(RichText::new("show last answer as").small().weak());
+                for (label, cmd) in [("rad", "torad(ans)"), ("DD", "todd(ans)"), ("DMS", "todms(ans)")] {
+                    if ui.small_button(label).clicked() {
+                        self.input = cmd.to_string();
+                        self.submit();
+                    }
+                }
+            });
+            ui.add_space(4.0);
             self.keypad(ui);
             ui.add_space(4.0);
         });
@@ -599,6 +608,17 @@ impl eframe::App for App {
     }
 }
 
+#[cfg(target_arch = "wasm32")]
+fn main() {
+    use eframe::wasm_bindgen::JsCast as _;
+    wasm_bindgen_futures::spawn_local(async {
+        let document = eframe::web_sys::window().and_then(|w| w.document()).expect("no document");
+        let canvas = document.get_element_by_id("ticalc_canvas").expect("no canvas").dyn_into::<eframe::web_sys::HtmlCanvasElement>().expect("not a canvas");
+        eframe::WebRunner::new().start(canvas, eframe::WebOptions::default(), Box::new(|_cc| Ok(Box::new(App::new())))).await.expect("failed to start");
+    });
+}
+
+#[cfg(not(target_arch = "wasm32"))]
 fn main() -> eframe::Result {
     let options = eframe::NativeOptions { viewport: egui::ViewportBuilder::default().with_inner_size([560.0, 780.0]).with_min_inner_size([420.0, 520.0]).with_title("TI-Calc CAS"), ..Default::default() };
     // optional start-up arguments: --eval "expr" (repeatable), --plot "f(x)" (repeatable), --tab graph|catalog
