@@ -39,6 +39,7 @@ impl Default for Settings {
 }
 
 pub struct Output {
+    pub figure: Option<crate::figure::Figure>,
     pub text: String,
     pub approx: Option<String>,
     pub note: Option<String>,
@@ -59,7 +60,11 @@ const COMMANDS: &[&str] = &[
     "sum", "product", "det", "inv", "transpose", "rref", "eigenvalues", "eigenvectors", "identity", "dot", "cross", "norm", "trace", "rank", "dim", "convert", "approx",
     "exact", "subst", "numer", "denom", "isprime", "hex", "bin", "oct", "del", "odesolve", "fmin", "fmax", "seq", "len", "polar", "rect", "root", "log2", "atan2", "mod",
     "ncr", "npr", "gcd", "lcm", "min", "max", "int", "frac", "and", "or", "tangent", "arclen", "charpoly", "nullspace", "units", "constants", "nextprime", "degree",
-    "coeffs", "trigexpand", "tolist", "augment", "unit", "dms", "todms", "todd", "torad",
+    "coeffs", "trigexpand", "tolist", "augment", "unit", "dms", "todms", "todd", "torad", "desolve", "lagrange", "hamiltonian", "hamilton", "fieldeq", "fieldsol", "fieldcheck", "orbperiod", "visviva", "vescape", "parallaxdist", "distmod", "absmag",
+];
+
+const GEOMETRY: &[&str] = &[
+    "inscribedangle", "centralangle", "chordlen", "tangentchord", "sagitta", "arclength", "sectorarea", "segmentarea", "chordsangle", "secantsangle", "powerpoint", "vecadd",
 ];
 
 /// (syntax, description) pairs for the function catalog.
@@ -122,6 +127,43 @@ pub const CATALOG: &[(&str, &str)] = &[
     ("constants()", "physical constants such as _c, _g, _h, _k, _Na"),
     ("approx(expr)", "decimal value; exact(x) converts a decimal to a fraction"),
     ("hex(n)", "base conversion; bin(n), oct(n); literals 0xFF, 0b101"),
+    ("desolve(eq, x, y)", "solve an ODE written with y' and y''; desolve(eq, x, y, x0, y0, yp0) with initial conditions"),
+    ("lagrange(L, q, t)", "Euler-Lagrange equation of motion; write the velocity as q'; lagrange(L, {x, y}, t) for several coordinates"),
+    ("hamiltonian(L, q)", "Hamiltonian H(q, p) from a Lagrangian; momenta are p, or p_x, p_y for several coordinates"),
+    ("hamilton(H, q, p)", "Hamilton's equations q' = dH/dp, p' = -dH/dq"),
+    ("fieldeq()", "list the standard field equations; fieldeq(wave) shows one with its frame and solutions"),
+    ("fieldsol(wave, 1)", "closed-form solution number n of a field equation"),
+    ("fieldcheck(wave, u)", "substitute u into a field equation: true, or the residual that is left"),
+    ("galilean(expr, v)", "Galilean boost x -> x - v*t; lorentzt(expr, v) is the Lorentz boost"),
+    ("lorentz(v)", "Lorentz factor; beta(v), rapidity(v); c is the symbol c, or _c when v is a number"),
+    ("timedil(t, v)", "time dilation; lencon(L, v) length contraction; veladd(u, v) velocity addition"),
+    ("relmom(m, v)", "relativistic momentum; relenergy(m, v), relke(m, v), restenergy(m)"),
+    ("reldoppler(f, v)", "relativistic Doppler shift for a source approaching at speed v"),
+    ("schwarzschild(M)", "Schwarzschild radius; gravdil(t, M, r) gravitational time dilation"),
+    ("inscribedangle(central)", "inscribed angle theorem: half the central angle on the same arc"),
+    ("centralangle(chord, r)", "central angle that a chord subtends; chordlen(r, angle) is the reverse"),
+    ("tangentchord(arc)", "tangent-chord theorem: half the intercepted arc"),
+    ("chordsangle(arc1, arc2)", "angle between two chords that cross inside a circle; secantsangle for outside"),
+    ("sagitta(r, chord)", "height of an arc; arclength(r, angle), sectorarea(r, angle), segmentarea(r, angle)"),
+    ("powerpoint(d, r)", "power of a point at distance d from the centre of a circle of radius r"),
+    ("vecadd(u, v)", "vector sum, drawn as a parallelogram for 2D vectors"),
+    ("jd(y, m, d, h, min, s)", "Julian date (UT); caldate(jd) converts back"),
+    ("gmst(jd)", "Greenwich mean sidereal time as an angle; lst(jd, east_longitude)"),
+    ("hms(h, m, s)", "angle from hours, minutes, seconds of time; tohms(angle) shows one"),
+    ("eq2hor(ha, dec, lat)", "altitude and azimuth from hour angle and declination; hor2eq(alt, az, lat)"),
+    ("eq2ecl(ra, dec)", "equatorial to ecliptic coordinates; ecl2eq(lon, lat); obliquity(jd)"),
+    ("angsep(ra1, dec1, ra2, dec2)", "angular separation of two directions"),
+    ("sunpos(jd)", "low-precision Sun: right ascension, declination, ecliptic longitude, distance"),
+    ("riseset(dec, lat)", "hour angle and azimuth at rising and setting, hours above the horizon"),
+    ("refraction(alt)", "atmospheric refraction at an apparent altitude; airmass(alt)"),
+    ("kepler(M, e)", "eccentric anomaly from mean anomaly; trueanomaly(E, e)"),
+    ("orbperiod(a, mu)", "orbital period; visviva(mu, r, a) orbital speed; vescape(mu, r)"),
+    ("parallaxdist(p)", "distance in parsecs from parallax in arcseconds; distmod(d), absmag(m, d)"),
+    ("sphsss(a, b, c)", "spherical triangle from three sides; also sphsas(a, C, b), sphasa(A, c, B), sphaaa(A, B, C)"),
+    ("sphexcess(A, B, C)", "spherical excess; spharea(A, B, C, R) triangle area"),
+    ("sphdist(lat1, lon1, lat2, lon2)", "great-circle central angle; add a radius as fifth argument for distance"),
+    ("sphbearing(lat1, lon1, lat2, lon2)", "initial great-circle bearing from north"),
+    ("navtri(lat, dec, lha)", "navigational triangle: altitude and azimuth of a body"),
     ("todms(x)", "show an angle as degrees, minutes, seconds; todd(x) decimal degrees; torad(x) radians"),
     ("dms(d, m, s)", "enter an angle in degrees, minutes, seconds; also 12°34'56\""),
     ("polar(z)", "{modulus, argument} of a complex number; rect(r, theta)"),
@@ -134,7 +176,7 @@ pub const CATALOG: &[(&str, &str)] = &[
 ];
 
 pub fn is_builtin(name: &str) -> bool {
-    COMMANDS.contains(&name) || UNARY_MATH.contains(&name) || stats::NAMES.contains(&name)
+    COMMANDS.contains(&name) || crate::astro::NAMES.contains(&name) || GEOMETRY.contains(&name) || crate::physics::REL_NAMES.contains(&name) || crate::physics::SPH_NAMES.contains(&name) || UNARY_MATH.contains(&name) || stats::NAMES.contains(&name)
 }
 
 fn err<T>(s: impl Into<String>) -> Result<T, String> {
@@ -227,6 +269,21 @@ fn radix_str(n: &BigInt, radix: u32, prefix: &str) -> String {
 impl Calc {
     pub fn new() -> Calc {
         Calc::default()
+    }
+
+    /// Degrees per unit of the current angle mode.
+    pub fn degrees_per_unit(&self) -> f64 {
+        match self.settings.angle {
+            Angle::Rad => 180.0 / std::f64::consts::PI,
+            Angle::Deg => 1.0,
+            Angle::Grad => 0.9,
+        }
+    }
+
+    /// Evaluate a raw tree with the given names kept symbolic.
+    pub(crate) fn ev_free(&self, raw: &Expr, free: &[&str]) -> Result<Expr, String> {
+        let shadow: Vec<String> = free.iter().map(|s| s.to_string()).collect();
+        self.ev(raw, &shadow)
     }
 
     fn knows(&self, name: &str) -> bool {
@@ -327,6 +384,92 @@ impl Calc {
             let (from, to) = (sym_name(&raw[1])?, sym_name(&raw[2])?);
             return Ok(Expr::Float(units::convert(real(&v)?, &from, &to)?));
         }
+        // mechanics and ODE forms: coordinates and their primed derivatives stay symbolic
+        if matches!(name, "desolve" | "lagrange" | "hamiltonian" | "hamilton") {
+            need(2)?;
+            let names_of = |e: &Expr| -> Result<Vec<String>, String> {
+                match e {
+                    Expr::List(v) => v.iter().map(sym_name).collect(),
+                    e => Ok(vec![sym_name(e)?]),
+                }
+            };
+            let mut hold = shadow.to_vec();
+            let primed = |ns: &[String], hold: &mut Vec<String>| {
+                for n in ns {
+                    hold.extend([n.clone(), format!("{n}'"), format!("{n}''")]);
+                }
+            };
+            match name {
+                "desolve" => {
+                    need(3)?;
+                    let (x, y) = (sym_name(&raw[1])?, sym_name(&raw[2])?);
+                    hold.push(x.clone());
+                    primed(std::slice::from_ref(&y), &mut hold);
+                    let eq = self.ev(&raw[0], &hold)?;
+                    let ics: Vec<Expr> = raw[3..].iter().map(|e| self.ev(e, shadow)).collect::<Result<_, _>>()?;
+                    if ics.len() == 1 {
+                        return err("initial conditions: desolve(eq, x, y, x0, y0) or desolve(eq, x, y, x0, y0, yp0)");
+                    }
+                    return crate::ode::desolve(&eq, &x, &y, &ics);
+                }
+                "lagrange" => {
+                    need(3)?;
+                    let (qs, t) = (names_of(&raw[1])?, sym_name(&raw[2])?);
+                    hold.push(t.clone());
+                    primed(&qs, &mut hold);
+                    let l = self.ev(&raw[0], &hold)?;
+                    let mut eqs = crate::physics::lagrange(&l, &qs, &t);
+                    return Ok(if eqs.len() == 1 { eqs.pop().unwrap() } else { Expr::List(eqs) });
+                }
+                "hamiltonian" => {
+                    let qs = names_of(&raw[1])?;
+                    primed(&qs, &mut hold);
+                    for q in &qs {
+                        hold.push(crate::physics::momentum_name(q, qs.len() == 1));
+                    }
+                    let l = self.ev(&raw[0], &hold)?;
+                    return crate::physics::hamiltonian(&l, &qs);
+                }
+                _ => {
+                    need(3)?;
+                    let (qs, ps) = (names_of(&raw[1])?, names_of(&raw[2])?);
+                    if qs.len() != ps.len() {
+                        return err("hamilton needs one momentum per coordinate");
+                    }
+                    primed(&qs, &mut hold);
+                    primed(&ps, &mut hold);
+                    let h = self.ev(&raw[0], &hold)?;
+                    return Ok(Expr::List(crate::physics::hamilton(&h, &qs, &ps)));
+                }
+            }
+        }
+        if matches!(name, "fieldeq" | "fieldsol" | "fieldcheck") {
+            if raw.is_empty() {
+                return Ok(Expr::Str(crate::physics::field_list()));
+            }
+            let f = crate::physics::field(&sym_name(&raw[0])?)?;
+            return Ok(match name {
+                "fieldeq" => Expr::Str(crate::physics::field_info(f, &|e| self.show(e))),
+                "fieldsol" => {
+                    let sols = (f.solutions)();
+                    let n = match raw.get(1) {
+                        Some(e) => self.ev(e, shadow)?.as_i64().ok_or("solution number must be an integer")?,
+                        None => 1,
+                    };
+                    sols.get((n - 1).max(0) as usize).filter(|_| n >= 1).map(|s| s.1.clone()).ok_or(format!("{} has {} solution(s)", f.name, sols.len()))?
+                }
+                _ => {
+                    need(2)?;
+                    // the field variables stay symbolic even if the session has values for them
+                    let mut hold = shadow.to_vec();
+                    hold.extend(["x", "y", "z", "t", "theta"].map(String::from));
+                    match crate::physics::field_check(f, &self.ev(&raw[1], &hold)?) {
+                        None => Expr::Bool(true),
+                        Some(r) => Expr::Rel(Rel::Eq, Box::new(sym("residual")), Box::new(r)),
+                    }
+                }
+            });
+        }
         if name == "del" {
             return err("del works at the top level: del(x)");
         }
@@ -378,6 +521,59 @@ impl Calc {
 
         if let Some(r) = stats::call(name, &a) {
             return r;
+        }
+        if let Some(r) = crate::astro::call(name, &a, self.degrees_per_unit()) {
+            return r;
+        }
+        if GEOMETRY.contains(&name) {
+            // circle theorems; angles and arcs are in the current angle mode
+            let k = self.angle_factor().unwrap_or(int(1));
+            let g = |i: usize| a.get(i).cloned().ok_or_else(|| format!("{name}: missing argument"));
+            let half = rat(1, 2);
+            return Ok(match name {
+                "inscribedangle" | "tangentchord" => mul(half, g(0)?),
+                "chordsangle" => mul(half, add(g(0)?, g(1)?)),
+                "secantsangle" => mul(half, sub(g(0)?, g(1)?)),
+                "centralangle" => div(mul(int(2), f1("asin", div(g(0)?, mul(int(2), g(1)?)))), k),
+                "chordlen" => mul_v(vec![int(2), g(0)?, f1("sin", mul_v(vec![half, g(1)?, k]))]),
+                "sagitta" => sub(g(0)?, sqrt(sub(pow(g(0)?, int(2)), mul(rat(1, 4), pow(g(1)?, int(2)))))),
+                "arclength" => mul_v(vec![g(0)?, g(1)?, k]),
+                "sectorarea" => mul_v(vec![half, pow(g(0)?, int(2)), g(1)?, k]),
+                "segmentarea" => mul_v(vec![half, pow(g(0)?, int(2)), sub(mul(g(1)?, k.clone()), f1("sin", mul(g(1)?, k)))]),
+                "powerpoint" => sub(pow(g(0)?, int(2)), pow(g(1)?, int(2))),
+                _ => add(g(0)?, g(1)?),
+            });
+        }
+        if crate::physics::SPH_NAMES.contains(&name) {
+            let k = self.angle_factor().unwrap_or(int(1));
+            if let Some(r) = crate::physics::spherical(name, &a, &k) {
+                return r;
+            }
+        }
+        if crate::physics::REL_NAMES.contains(&name) {
+            // speed of light: the symbol c for symbolic input, the SI value for numeric input
+            // the speed arguments decide: a numeric speed means SI units
+            let speed_args: &[usize] = match name {
+                "lorentz" | "beta" | "rapidity" => &[0],
+                "veladd" => &[0, 1],
+                "restenergy" | "schwarzschild" => &[0],
+                "gravdil" => &[1, 2],
+                _ => &[1],
+            };
+            let numeric = speed_args.iter().all(|i| a.get(*i).is_some_and(|e| e.is_constant()));
+            let c = match self.vars.get("c") {
+                Some(v) => v.clone(),
+                None if numeric => int(299_792_458),
+                None => sym("c"),
+            };
+            let g = match self.vars.get("G") {
+                Some(v) => v.clone(),
+                None if numeric => Expr::Float(6.674_30e-11),
+                None => sym("G"),
+            };
+            if let Some(r) = crate::physics::relativity(name, &a, &c, &g) {
+                return r;
+            }
         }
 
         let var = || -> Result<String, String> {
@@ -876,6 +1072,34 @@ impl Calc {
                 let secs = secs.trim_end_matches('0').trim_end_matches('.');
                 Expr::Str(format!("{}{}°{}'{}\"", if v < 0.0 { "-" } else { "" }, d, m, secs))
             }
+            "orbperiod" => {
+                // orbperiod(semi-major axis, gravitational parameter mu = G*M)
+                need(2)?;
+                mul_v(vec![int(2), PI, sqrt(div(pow(a[0].clone(), int(3)), a[1].clone()))])
+            }
+            "visviva" => {
+                // visviva(mu, r, a): orbital speed
+                need(3)?;
+                sqrt(mul(a[0].clone(), sub(div(int(2), a[1].clone()), pow(a[2].clone(), int(-1)))))
+            }
+            "vescape" => {
+                need(2)?;
+                sqrt(div(mul(int(2), a[0].clone()), a[1].clone()))
+            }
+            "parallaxdist" => {
+                // parallax in arcseconds -> distance in parsecs
+                need(1)?;
+                pow(a[0].clone(), int(-1))
+            }
+            "distmod" => {
+                need(1)?;
+                sub(mul(int(5), func("log", vec![a[0].clone()])), int(5))
+            }
+            "absmag" => {
+                // absmag(apparent magnitude, distance in parsecs)
+                need(2)?;
+                add(sub(a[0].clone(), mul(int(5), func("log", vec![a[1].clone()]))), int(5))
+            }
             "units" => Expr::Str(units::unit_list()),
             "constants" => Expr::Str(units::CONSTANTS.iter().map(|(n, v, d)| format!("{n} = {v:e}  ({d})")).collect::<Vec<_>>().join("\n")),
             _ => func(name, a),
@@ -886,7 +1110,7 @@ impl Calc {
         if self.settings.complex {
             return Ok(());
         }
-        let is_i = |e: &Expr| matches!(e, Expr::Const(Const::I)) || matches!(e, Expr::Sym(s) if s == "i") || matches!(e, Expr::Func(n, _) if n == "csolve" || n == "czeros" || n == "eigenvalues" || n == "eigenvectors" || n == "rect");
+        let is_i = |e: &Expr| matches!(e, Expr::Const(Const::I)) || matches!(e, Expr::Sym(s) if s == "i") || matches!(e, Expr::Func(n, _) if ["csolve", "czeros", "eigenvalues", "eigenvectors", "rect", "fieldsol", "fieldcheck", "fieldeq", "hamiltonian", "hamilton", "lagrange", "desolve"].contains(&n.as_str()));
         if v.has(&|e| matches!(e, Expr::Const(Const::I))) && !raw.has(&is_i) {
             return err("non-real result (switch to Complex mode to see it)");
         }
@@ -919,7 +1143,7 @@ impl Calc {
                     }
                 }
                 let text = if removed.is_empty() { "nothing to delete".to_string() } else { format!("deleted {}", removed.join(", ")) };
-                return Ok(Output { text: text.clone(), approx: None, note: None, value: Expr::Str(text) });
+                return Ok(Output { figure: None, text: text.clone(), approx: None, note: None, value: Expr::Str(text) });
             }
             if n == ":=" {
                 match &args[0] {
@@ -934,7 +1158,10 @@ impl Calc {
                         }
                         self.vars.insert(name.clone(), v.clone());
                         self.funcs.remove(name);
-                        return Ok(self.output(v));
+                        let figure = crate::figure::build(self, &args[1], &v);
+                        let mut out = self.output(v);
+                        out.figure = figure;
+                        return Ok(out);
                     }
                     Expr::Func(name, params) => {
                         if is_builtin(name) {
@@ -946,7 +1173,7 @@ impl Calc {
                         // show the definition with the body evaluated symbolically where possible
                         let body = self.ev(&args[1], &params).unwrap_or_else(|_| args[1].clone());
                         let text = format!("{}({}) := {}", name, params.join(", "), self.show(&body));
-                        return Ok(Output { text, approx: None, note: None, value: body });
+                        return Ok(Output { figure: None, text, approx: None, note: None, value: body });
                     }
                     _ => return err("bad assignment"),
                 }
@@ -956,7 +1183,10 @@ impl Calc {
         self.check_real(&raw, &v)?;
         let v = if self.settings.approx { to_float(&v) } else { v };
         self.ans = Some(v.clone());
-        Ok(self.output(v))
+        let figure = crate::figure::build(self, &raw, &v);
+        let mut out = self.output(v);
+        out.figure = figure;
+        Ok(out)
     }
 
     fn output(&self, v: Expr) -> Output {
@@ -984,7 +1214,7 @@ impl Calc {
             };
             (wants(&v) && strip(&s) != strip(&text) && !f.is_undef()).then_some(s)
         };
-        Output { text, approx, note: self.note.borrow().clone(), value: v }
+        Output { figure: None, text, approx, note: self.note.borrow().clone(), value: v }
     }
 
     /// Numeric function of one variable for plotting.

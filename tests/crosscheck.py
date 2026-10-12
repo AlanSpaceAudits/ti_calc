@@ -21,7 +21,7 @@ def parse(s):
 
 def run(lines):
     out = subprocess.run([CLI], input="\n".join(lines) + "\n", capture_output=True, text=True, timeout=600).stdout.splitlines()
-    return [o.split("  ≈ ")[0].split("  (")[0].strip() for o in out]
+    return [o.split("  [figure")[0].split("  ≈ ")[0].split("  (")[0].strip() for o in out]
 
 
 def close(p, q, tol=1e-8):
@@ -94,6 +94,15 @@ T = [
     ("det([[2,1,3],[0,-1,4],[5,2,1]])", "val", "Matrix([[2,1,3],[0,-1,4],[5,2,1]]).det()"),
     ("det([[1,2,3,4],[2,0,1,5],[3,1,0,2],[4,5,2,1]])", "val", "Matrix([[1,2,3,4],[2,0,1,5],[3,1,0,2],[4,5,2,1]]).det()"),
     ("normalcdf(-1.96,1.96)", "val", "erf(1.96/sqrt(2))"), ("invnorm(0.9)", "val", "sqrt(2)*erfinv(0.8)"), ("binompdf(20,0.3,7)", "val", "binomial(20,7)*0.3**7*0.7**13"),
+    ("desolve(y' + 2y = e^x, x, y)", "ode", "Derivative(Y, x) + 2*Y - exp(x)"), ("desolve(y' = x*y, x, y)", "ode", "Derivative(Y, x) - x*Y"),
+    ("desolve(y' + y/x = x^2, x, y)", "ode", "Derivative(Y, x) + Y/x - x**2"), ("desolve(y' = y^2*x, x, y)", "ode", "Derivative(Y, x) - Y**2*x"),
+    ("desolve(y'' - 5y' + 6y = e^x, x, y)", "ode", "Derivative(Y, x, 2) - 5*Derivative(Y, x) + 6*Y - exp(x)"),
+    ("desolve(y'' + 2y' + 5y = 0, x, y)", "ode", "Derivative(Y, x, 2) + 2*Derivative(Y, x) + 5*Y"),
+    ("desolve(y'' + 9y = cos(2x), x, y)", "ode", "Derivative(Y, x, 2) + 9*Y - cos(2*x)"), ("desolve(y'' + 4y' + 4y = x, x, y)", "ode", "Derivative(Y, x, 2) + 4*Derivative(Y, x) + 4*Y - x"),
+    ("lorentz(12/13*_c)", "val", "Rational(13,5)"), ("veladd(0.6*_c, 0.7*_c)/_c", "val", "1.3/1.42"), ("jd(1987, 4, 10, 19, 21)", "val", "2446896.30625"),
+    ("gmst(2446896.30625)*180/pi", "val", "Mod(280.46061837 + 360.98564736629*(2446896.30625-2451545) + 0.000387933*((2446896.30625-2451545)/36525)**2, 360)"),
+    ("sphdist(0.5, 0.2, 1.1, 2.0)", "val", "acos(sin(0.5)*sin(1.1) + cos(0.5)*cos(1.1)*cos(1.8))"),
+    ("kepler(1.0, 0.3)", "val", "nsolve(Symbol('E') - 0.3*sin(Symbol('E')) - 1.0, 1.0)"), ("chordlen(3, 1.2)", "val", "6*sin(0.6)"),
     ("tcdf(-1.5,1.5,7)", "val", "1-betainc_regularized(3.5,0.5,0,7/(7+2.25))"), ("chi2cdf(0,3,4)", "val", "lowergamma(2,1.5)/gamma(2)"), ("poissoncdf(2.5,3)", "val", "exp(-2.5)*(1+2.5+2.5**2/2+2.5**3/6)"),
 ]
 
@@ -106,6 +115,13 @@ def main():
             if kind in ("val", "expr"):
                 r = parse_expr(ref, local_dict={**vars(sp), "x": x, "y": y, "a": a, "b": b, "n": n, "k": k}) if not isinstance(ref, sp.Basic) else ref
                 ok = same(parse(out), sp.sympify(r).doit())
+            elif kind == "ode":
+                C1, C2 = sp.symbols("C1 C2", real=True)
+                sol = parse_expr(out.split(" or ")[0].split("=", 1)[1].replace("^", "**").replace("e**", "E**"), local_dict=LOCALS | {"C1": C1, "C2": C2}, transformations=TR)
+                Y = sp.Symbol("Y")
+                res = parse_expr(ref, local_dict={**vars(sp), "x": x, "Y": Y})
+                res = res.replace(lambda e: isinstance(e, sp.Derivative), lambda e: sp.diff(sol, *e.variables)).subs(Y, sol)
+                ok = same(res, sp.Integer(0) * x)
             elif kind == "int":
                 f = parse_expr(ref, local_dict={**vars(sp), "x": x})
                 ok = same(sp.diff(parse(out), x), f)

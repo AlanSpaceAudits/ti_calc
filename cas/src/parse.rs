@@ -85,6 +85,9 @@ fn lex(src: &str) -> Result<Vec<Tok>, String> {
             while i < s.len() && (s[i].is_alphanumeric() || s[i] == '_' || s[i] == '@') && s[i] != 'π' {
                 i += 1;
             }
+            while i < s.len() && s[i] == '\'' {
+                i += 1;
+            }
             let id: String = s[start..i].iter().collect();
             out.push(Tok::Id(match id.as_str() {
                 "Σ" => "sum".into(),

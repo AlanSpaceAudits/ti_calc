@@ -98,6 +98,9 @@ pub fn cancel(n: &Expr, d: &Expr) -> (Expr, Expr) {
     if n == d {
         return (int(1), int(1));
     }
+    if let Some(q) = div_exact(&n, &d) {
+        return (q, int(1));
+    }
     if !matches!(d, Expr::Add(_)) {
         let r = expand(&div(n.clone(), d.clone()));
         if !r.has(&|x| matches!(x, Expr::Pow(_, k) if k.has_neg_coeff())) {
@@ -105,6 +108,38 @@ pub fn cancel(n: &Expr, d: &Expr) -> (Expr, Expr) {
         }
     }
     (n, d)
+}
+
+/// Polynomial long division in one variable with symbolic coefficients; Some(q) when n = q*d exactly.
+fn div_exact(n: &Expr, d: &Expr) -> Option<Expr> {
+    let neg_pow = |e: &Expr| e.has(&|x| matches!(x, Expr::Pow(_, k) if k.has_neg_coeff()));
+    for var in d.free_syms() {
+        let (Some(mut rem), Some(dc)) = (poly::coeffs_expr(n, &var), poly::coeffs_expr(d, &var)) else { continue };
+        let lead = dc.last()?.clone();
+        if dc.len() < 2 || matches!(lead, Expr::Add(_)) || rem.len() > 60 {
+            continue;
+        }
+        let mut quo = vec![int(0); rem.len().saturating_sub(dc.len()) + 1];
+        let mut ok = true;
+        while rem.len() >= dc.len() {
+            let k = rem.len() - dc.len();
+            let q = expand(&div(rem.last().unwrap().clone(), lead.clone()));
+            if neg_pow(&q) {
+                ok = false;
+                break;
+            }
+            for (i, c) in dc.iter().enumerate() {
+                rem[k + i] = expand(&sub(rem[k + i].clone(), mul(q.clone(), c.clone())));
+            }
+            quo[k] = q;
+            rem.pop();
+        }
+        if ok && rem.iter().all(|c| c.is_zero()) {
+            let x = sym(&var);
+            return Some(expand(&add_v(quo.into_iter().enumerate().map(|(i, c)| mul(c, pow(x.clone(), int(i as i64)))).collect())));
+        }
+    }
+    None
 }
 
 pub fn ratsimp(e: &Expr) -> Expr {

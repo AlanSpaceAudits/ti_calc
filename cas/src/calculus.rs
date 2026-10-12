@@ -58,7 +58,7 @@ pub fn diff(e: &Expr, x: &str) -> Expr {
                 "abs" => f1("sign", u.clone()),
                 "erf" => mul_v(vec![int(2), pow(PI, rat(-1, 2)), pow(E, neg(u2()))]),
                 "sign" | "floor" | "ceil" | "round" | "ipart" => int(0),
-                _ => return Expr::Func("diff".into(), vec![e.clone(), sym(x)]),
+                _ => Expr::Func(format!("{name}'"), vec![u.clone()]),
             };
             mul(d, du)
         }

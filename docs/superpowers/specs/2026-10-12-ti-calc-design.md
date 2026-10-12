@@ -19,9 +19,12 @@ Cargo workspace with two crates.
   - `calculus`: derivative, antiderivative, definite integral, limit, Taylor series, sums.
   - `matrix`, `stats`, `units`: linear algebra, statistics and distributions, unit conversion and constants.
   - `numeric`: complex float evaluation, special functions, root finding, quadrature.
+  - `ode`: symbolic ODE solver. `physics`: relativity, Lagrangian and Hamiltonian mechanics, field-equation library, spherical trigonometry. `astro`: positional astronomy.
+  - `figure`: builds a list of plain shapes (lines, arrows, fills, dots, text) for a result; front ends only draw them.
+  - `demos`: worked examples as (explanation, input) steps, run in a fresh session.
   - `parse`, `print`: input grammar and output format.
   - `eval`: session state (variables, functions, modes) and command dispatch.
-- `app`: eframe/egui desktop program. Tabs: Calculator, Graph, Catalog.
+- `app`: eframe/egui desktop program. Tabs: Calculator, Graph, Demos, Catalog.
 
 ## Decisions
 
@@ -35,9 +38,10 @@ Cargo workspace with two crates.
 ## Verification
 
 - `cargo test -p cas`: engine and mode tests.
-- `tests/crosscheck.py`: 118 results compared with sympy (values, expressions, antiderivatives, roots).
+- `tests/crosscheck.py`: 133 results compared with sympy (values, expressions, antiderivatives, roots).
 
 ## Not built
 
-- Risch integration, multivariate polynomial factoring, symbolic ODE solving.
+- Risch integration, multivariate polynomial factoring, partial differential equation solving beyond the library of standard solutions.
+- Moon, planet and star positions.
 - 2D pretty-printed output.

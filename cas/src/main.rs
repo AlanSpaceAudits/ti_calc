@@ -26,6 +26,30 @@ fn main() {
                 println!("modes: deg rad grad | exact approx | real complex | normal sci eng | fix N | float");
                 continue;
             }
+            "demo" => {
+                for (i, d) in cas::demos::DEMOS.iter().enumerate() {
+                    println!("{:2}  {}: {}", i + 1, d.group, d.title);
+                }
+                println!("demo N runs one");
+                continue;
+            }
+            _ if line.starts_with("demo ") => {
+                let picks: Vec<usize> = if line[5..].trim() == "all" { (0..cas::demos::DEMOS.len()).collect() } else { line[5..].trim().parse::<usize>().ok().and_then(|n| n.checked_sub(1)).into_iter().collect() };
+                for d in picks.into_iter().filter_map(|i| cas::demos::DEMOS.get(i)) {
+                    println!("\n== {}: {} ==\n{}", d.group, d.title, d.about);
+                    for s in cas::demos::run(d) {
+                        if !s.note.is_empty() {
+                            println!("\n{}", s.note);
+                        }
+                        println!("  > {}", s.input);
+                        match s.output {
+                            Ok(o) => println!("  {}", o.replace('\n', "\n  ")),
+                            Err(e) => println!("  error: {e}"),
+                        }
+                    }
+                }
+                continue;
+            }
             "deg" => calc.settings.angle = Angle::Deg,
             "rad" => calc.settings.angle = Angle::Rad,
             "grad" => calc.settings.angle = Angle::Grad,
@@ -47,6 +71,9 @@ fn main() {
                         }
                         if let Some(n) = o.note {
                             s.push_str(&format!("  ({n})"));
+                        }
+                        if let Some(f) = o.figure {
+                            s.push_str(&format!("  [figure: {}, {} shapes]", f.title, f.shapes.len()));
                         }
                         println!("{s}");
                     }

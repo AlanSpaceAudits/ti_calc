@@ -1,11 +1,16 @@
 //! Computer algebra engine for the calculator.
 pub mod algebra;
+pub mod astro;
 pub mod calculus;
+pub mod demos;
 pub mod eval;
 pub mod expr;
+pub mod figure;
 pub mod matrix;
 pub mod numeric;
+pub mod ode;
 pub mod parse;
+pub mod physics;
 pub mod poly;
 pub mod print;
 pub mod simplify;
@@ -15,6 +20,7 @@ pub mod units;
 
 pub use eval::{Angle, CATALOG, Calc, Output, Settings};
 pub use expr::Expr;
+pub use figure::{Figure, Shape};
 pub use print::{Fmt, Notation};
 
 #[cfg(test)]
@@ -47,6 +53,39 @@ mod tests {
             ("mean({1,2,3,4})", "5/2"),
             ("0.1+0.2", "0.3"),
             ("integrate(1/x,x,-1,1)", "error: integral does not converge on this interval"),
+        ] {
+            assert_eq!(run(input), want, "input: {input}");
+        }
+    }
+
+    #[test]
+    fn demos_run_clean() {
+        for d in demos::DEMOS {
+            for s in demos::run(d) {
+                assert!(s.output.is_ok(), "{} / {}: {:?}", d.title, s.input, s.output);
+            }
+        }
+    }
+
+    #[test]
+    fn field_solutions_satisfy_their_equations() {
+        for f in physics::FIELD_EQS {
+            for (label, u) in (f.solutions)() {
+                assert!(physics::field_check(f, &u).is_none(), "{}: {}", f.name, label);
+            }
+        }
+    }
+
+    #[test]
+    fn ode_and_mechanics() {
+        for (input, want) in [
+            ("desolve(y' = y, x, y, 0, 2)", "y = 2*e^x"),
+            ("desolve(y'' + y = 0, x, y, 0, 1, 0)", "y = cos(x)"),
+            ("desolve(y'' + 4y = sin(x), x, y)", "y = C1*cos(2*x) + C2*sin(2*x) + sin(x)/3"),
+            ("lagrange(m*x'^2/2 - k*x^2/2, x, t)", "x'' = -k*x/m"),
+            ("hamilton(p^2/(2m) + k*x^2/2, x, p)", "{x' = p/m, p' = -k*x}"),
+            ("lorentz(3/5*_c)", "5/4"),
+            ("simplify(lorentzt(x^2 - c^2*t^2, v))", "-c^2*t^2 + x^2"),
         ] {
             assert_eq!(run(input), want, "input: {input}");
         }

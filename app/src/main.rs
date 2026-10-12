@@ -2,14 +2,16 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use cas::numeric::{self, evalf};
-use cas::{Angle, CATALOG, Calc, Expr, Notation};
+use cas::demos::{DEMOS, StepResult};
+use cas::{Angle, CATALOG, Calc, Expr, Figure, Notation, Shape};
 use eframe::egui::{self, Align, Color32, Key, Layout, RichText};
-use egui_plot::{Legend, Line, MarkerShape, Plot, PlotBounds, PlotPoint, PlotPoints, Points, Text};
+use egui_plot::{Arrows, Legend, Line, LineStyle, MarkerShape, Plot, PlotBounds, PlotPoint, PlotPoints, Points, Polygon, Text};
 
 #[derive(PartialEq, Clone, Copy)]
 enum Tab {
     Calc,
     Graph,
+    Demos,
     Catalog,
 }
 
@@ -26,6 +28,8 @@ struct Entry {
     approx: Option<String>,
     note: Option<String>,
     error: bool,
+    figure: Option<Figure>,
+    show_figure: bool,
 }
 
 struct PlotFn {
@@ -58,6 +62,8 @@ struct App {
     equal_axes: bool,
     reset_view: bool,
     filter: String,
+    demo: usize,
+    demo_steps: Vec<StepResult>,
 }
 
 const COLORS: [Color32; 6] = [
@@ -97,6 +103,8 @@ impl App {
             equal_axes: false,
             reset_view: false,
             filter: String::new(),
+            demo: 0,
+            demo_steps: cas::demos::run(&DEMOS[0]),
         }
     }
 
@@ -105,13 +113,30 @@ impl App {
         if src.is_empty() {
             return;
         }
+        let s = &mut self.calc.settings;
+        let mode = match src.as_str() {
+            "deg" => Some(s.angle = Angle::Deg),
+            "rad" => Some(s.angle = Angle::Rad),
+            "grad" => Some(s.angle = Angle::Grad),
+            "exact" => Some(s.approx = false),
+            "approx" => Some(s.approx = true),
+            "real" => Some(s.complex = false),
+            "complex" => Some(s.complex = true),
+            _ => None,
+        };
         if src == "clear" {
             self.history.clear();
+        } else if mode.is_some() {
+            self.history.push(Entry { input: src.clone(), text: format!("mode: {src}"), approx: None, note: None, error: false, figure: None, show_figure: false });
         } else {
             let e = match self.calc.eval_line(&src) {
-                Ok(o) => Entry { input: src, text: o.text, approx: o.approx, note: o.note, error: false },
-                Err(e) => Entry { input: src, text: e, approx: None, note: None, error: true },
+                Ok(o) => Entry { input: src, text: o.text, approx: o.approx, note: o.note, error: false, show_figure: o.figure.is_some(), figure: o.figure },
+                Err(e) => Entry { input: src, text: e, approx: None, note: None, error: true, figure: None, show_figure: false },
             };
+            // only the newest figure stays open, so the tape stays short
+            for old in &mut self.history {
+                old.show_figure = false;
+            }
             self.history.push(e);
         }
         self.input.clear();
@@ -127,6 +152,7 @@ impl App {
         ui.horizontal_wrapped(|ui| {
             ui.selectable_value(&mut self.tab, Tab::Calc, "Calculator");
             ui.selectable_value(&mut self.tab, Tab::Graph, "Graph");
+            ui.selectable_value(&mut self.tab, Tab::Demos, "Demos");
             ui.selectable_value(&mut self.tab, Tab::Catalog, "Catalog");
             ui.separator();
             let s = &mut self.calc.settings;
@@ -287,7 +313,8 @@ impl App {
                         }
                     }
                 }
-                for e in &self.history {
+                let mut to_graph: Option<String> = None;
+                for (idx, e) in self.history.iter_mut().enumerate() {
                     ui.add_space(4.0);
                     if ui.add(egui::Label::new(RichText::new(&e.input).monospace().size(15.0).weak()).sense(egui::Sense::click())).on_hover_text("click to edit again").clicked() {
                         paste = Some(e.input.clone());
@@ -296,23 +323,119 @@ impl App {
                         let color = if e.error { ui.visuals().error_fg_color } else { ui.visuals().strong_text_color() };
                         let main = egui::Label::new(RichText::new(&e.text).monospace().size(19.0).color(color)).wrap().sense(egui::Sense::click());
                         if ui.add(main).on_hover_text("click to insert").clicked() && !e.error {
-                            paste = Some(format!("{}{}", self.input, e.text));
+                            paste = Some(e.text.clone());
                         }
                         if let Some(a) = &e.approx {
                             let lbl = egui::Label::new(RichText::new(format!("≈ {a}")).monospace().size(15.0)).wrap().sense(egui::Sense::click());
                             if ui.add(lbl).clicked() {
-                                paste = Some(format!("{}{}", self.input, a));
+                                paste = Some(a.clone());
                             }
                         }
                         if let Some(n) = &e.note {
                             ui.label(RichText::new(n).small().weak());
                         }
                     });
+                    if let Some(fig) = &e.figure {
+                        ui.horizontal(|ui| {
+                            if ui.small_button(if e.show_figure { "hide figure" } else { "show figure" }).clicked() {
+                                e.show_figure = !e.show_figure;
+                            }
+                            if let Some(src) = &fig.graph_src {
+                                if ui.small_button("open in Graph").clicked() {
+                                    to_graph = Some(src.clone());
+                                }
+                            }
+                        });
+                        if e.show_figure {
+                            draw_figure(ui, ("fig", idx), fig, 280.0);
+                        }
+                    }
                     ui.separator();
+                }
+                if let Some(src) = to_graph {
+                    match self.fns.iter_mut().find(|f| f.src.trim().is_empty()) {
+                        Some(slot) => *slot = PlotFn::new(&src),
+                        None => self.fns.push(PlotFn::new(&src)),
+                    }
+                    self.tab = Tab::Graph;
                 }
             });
             if let Some(p) = paste {
-                self.input = p;
+                self.input.push_str(&p);
+                self.refocus = true;
+            }
+        });
+    }
+
+    fn demos_tab(&mut self, ui: &mut egui::Ui) {
+        egui::Panel::left("demo_list").min_size(230.0).show(ui, |ui| {
+            egui::ScrollArea::vertical().id_salt("demo_scroll").show(ui, |ui| {
+                let mut group = "";
+                for (i, d) in DEMOS.iter().enumerate() {
+                    if d.group != group {
+                        group = d.group;
+                        ui.add_space(6.0);
+                        ui.label(RichText::new(group).strong());
+                    }
+                    if ui.selectable_label(self.demo == i, d.title).clicked() && self.demo != i {
+                        self.demo = i;
+                        self.demo_steps = cas::demos::run(d);
+                    }
+                }
+            });
+        });
+        egui::CentralPanel::default().show(ui, |ui| {
+            let d = &DEMOS[self.demo];
+            let mut try_it: Option<String> = None;
+            let mut run_all = false;
+            egui::ScrollArea::vertical().auto_shrink([false, false]).id_salt(("demo_body", self.demo)).show(ui, |ui| {
+                ui.heading(d.title);
+                ui.label(d.about);
+                ui.add_space(4.0);
+                if ui.button("Run every step in the calculator").clicked() {
+                    run_all = true;
+                }
+                ui.separator();
+                for (i, step) in self.demo_steps.iter().enumerate() {
+                    if !step.note.is_empty() {
+                        ui.add_space(6.0);
+                        ui.label(step.note);
+                    }
+                    ui.horizontal_wrapped(|ui| {
+                        ui.label(RichText::new("type:").small().weak());
+                        if ui.link(RichText::new(step.input).monospace().size(15.0)).on_hover_text("click to put this in the calculator").clicked() {
+                            try_it = Some(step.input.to_string());
+                        }
+                    });
+                    match &step.output {
+                        Ok(o) => {
+                            ui.add(egui::Label::new(RichText::new(o).monospace().size(16.0).color(ui.visuals().strong_text_color())).wrap());
+                        }
+                        Err(e) => {
+                            ui.colored_label(ui.visuals().error_fg_color, e);
+                        }
+                    }
+                    if let Some(fig) = &step.figure {
+                        draw_figure(ui, ("demo_fig", self.demo, i), fig, 300.0);
+                    }
+                }
+            });
+            if run_all {
+                for (_, input) in d.steps {
+                    match *input {
+                        "deg" => self.calc.settings.angle = Angle::Deg,
+                        "rad" => self.calc.settings.angle = Angle::Rad,
+                        src => {
+                            self.input = src.to_string();
+                            self.submit();
+                        }
+                    }
+                }
+                self.tab = Tab::Calc;
+            }
+            if let Some(t) = try_it {
+                self.input = t;
+                self.tab = Tab::Calc;
                 self.refocus = true;
             }
         });
@@ -587,6 +710,68 @@ impl App {
     }
 }
 
+fn figure_color(i: u8, ui: &egui::Ui) -> Color32 {
+    if i >= 6 { ui.visuals().weak_text_color() } else { COLORS[i as usize % COLORS.len()] }
+}
+
+/// Draw a figure made of plain shapes.
+fn draw_figure(ui: &mut egui::Ui, id: impl std::hash::Hash + std::fmt::Debug, fig: &Figure, height: f32) {
+    ui.label(RichText::new(&fig.title).strong());
+    let mut plot = Plot::new(id).height(height).legend(Legend::default()).allow_scroll(false).show_axes([!fig.equal, !fig.equal]).show_grid([!fig.equal, !fig.equal]);
+    if fig.equal || fig.square {
+        // a square frame keeps the whole figure in view
+        let side = height.max(400.0).min(ui.available_width());
+        plot = plot.width(side).height(side);
+    }
+    if fig.equal {
+        plot = plot.data_aspect(1.0);
+    }
+    if let Some(b) = fig.bounds {
+        plot = plot.auto_bounds(egui::Vec2b::FALSE).default_x_bounds(b[0], b[1]).default_y_bounds(b[2], b[3]);
+    }
+    let text_color = ui.visuals().strong_text_color();
+    let colors: Vec<Color32> = (0..=6).map(|i| figure_color(i, ui)).collect();
+    plot.show(ui, |pui| {
+        for shape in &fig.shapes {
+            match shape {
+                Shape::Fill { pts, color } => {
+                    let c = colors[(*color).min(6) as usize];
+                    let fill = c.gamma_multiply(0.25);
+                    if pts.len() <= 5 {
+                        pui.polygon(Polygon::new("", PlotPoints::from(pts.clone())).fill_color(fill).stroke(egui::Stroke::NONE));
+                    } else {
+                        // area under a curve: one strip per sample keeps every piece convex
+                        for w in pts[1..pts.len() - 1].windows(2) {
+                            let strip = vec![[w[0][0], 0.0], w[0], w[1], [w[1][0], 0.0]];
+                            pui.polygon(Polygon::new("", PlotPoints::from(strip)).fill_color(fill).stroke(egui::Stroke::NONE));
+                        }
+                    }
+                }
+                Shape::Line { pts, color, dashed, name } => {
+                    let mut line = Line::new(name.clone(), PlotPoints::from(pts.clone())).color(colors[(*color).min(6) as usize]).width(if *color >= 6 { 1.0 } else { 2.0 });
+                    if *dashed {
+                        line = line.style(LineStyle::dashed_loose());
+                    }
+                    pui.line(line);
+                }
+                Shape::Arrow { from, to, color, name } => {
+                    pui.arrows(Arrows::new(name.clone(), PlotPoints::from(vec![*from]), PlotPoints::from(vec![*to])).color(colors[(*color).min(6) as usize]));
+                    pui.line(Line::new(name.clone(), PlotPoints::from(vec![*from, *to])).color(colors[(*color).min(6) as usize]).width(2.0));
+                }
+                Shape::Dot { at, color, name } => {
+                    pui.points(Points::new(name.clone(), PlotPoints::from(vec![*at])).radius(4.5).shape(MarkerShape::Circle).color(colors[(*color).min(6) as usize]));
+                }
+                Shape::Text { at, text } => {
+                    pui.text(Text::new("", PlotPoint::new(at[0], at[1]), RichText::new(text).size(14.0)).color(text_color));
+                }
+            }
+        }
+    });
+    if !fig.caption.is_empty() {
+        ui.label(RichText::new(&fig.caption).small().weak());
+    }
+}
+
 fn trim(v: f64) -> String {
     let s = format!("{:.6}", v);
     let s = s.trim_end_matches('0').trim_end_matches('.');
@@ -603,6 +788,7 @@ impl eframe::App for App {
         match self.tab {
             Tab::Calc => self.calc_tab(ui),
             Tab::Graph => self.graph_tab(ui),
+            Tab::Demos => self.demos_tab(ui),
             Tab::Catalog => self.catalog_tab(ui),
         }
     }
@@ -632,9 +818,17 @@ fn main() -> eframe::Result {
                 app.submit();
             }
             ("--plot", Some(f)) => plots.push(PlotFn::new(f)),
+            ("--demo", Some(n)) => {
+                if let Some(i) = n.parse::<usize>().ok().and_then(|n| n.checked_sub(1)).filter(|i| *i < DEMOS.len()) {
+                    app.demo = i;
+                    app.demo_steps = cas::demos::run(&DEMOS[i]);
+                    app.tab = Tab::Demos;
+                }
+            }
             ("--tab", Some(t)) => {
                 app.tab = match t.as_str() {
                     "graph" => Tab::Graph,
+                    "demos" => Tab::Demos,
                     "catalog" => Tab::Catalog,
                     _ => Tab::Calc,
                 }
