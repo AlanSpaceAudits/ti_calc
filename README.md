@@ -2,6 +2,10 @@
 
 A computer algebra calculator in Rust. Target: TI-89 / Nspire CAS feature set.
 
+**Run it in a browser:** https://alanspaceaudits.github.io/ti_calc/
+
+**Offline copy:** download [`docs/index.html`](https://github.com/AlanSpaceAudits/ti_calc/raw/main/docs/index.html) and open it. It is one self-contained file (about 9 MB) and needs no install and no network.
+
 - `cas/` is the math engine (library plus the `ticalc-cli` terminal front end).
 - `app/` is the desktop program (`ticalc`): history tape, keypad, graphing, function catalog.
 
@@ -19,7 +23,7 @@ Release builds for Linux, Windows and the web go to `dist/`:
 ./scripts/build-dist.sh
 ```
 
-This needs `mingw-w64-gcc`, `trunk`, and a rustup toolchain with the `x86_64-pc-windows-gnu` and `wasm32-unknown-unknown` targets. `dist/web/` is a static site; serve it with any web server.
+This needs `mingw-w64-gcc`, `trunk`, and a rustup toolchain with the `x86_64-pc-windows-gnu` and `wasm32-unknown-unknown` targets. `dist/web/` is a static site; serve it with any web server. The script also packs the web build into the single file `docs/index.html` (`scripts/single_html.py`).
 
 Start-up arguments for the desktop program: `--eval "expr"`, `--plot "f(x)"`, `--tab graph|catalog`.
 
